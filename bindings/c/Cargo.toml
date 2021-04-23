@@ -1,5 +1,5 @@
 [package]
-name = "c"
+name = "tokenizers-c"
 version = "0.1.0"
 authors = ["Niupple <niupple@gmail.com>"]
 edition = "2018"
@@ -11,3 +11,7 @@ name = "tokenizers"
 crate-type = ["cdylib"]
 
 [dependencies]
+
+[dependencies.tokenizers]
+version = "*"
+path = "../../tokenizers"
