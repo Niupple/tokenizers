@@ -4,13 +4,14 @@ use tk::tokenizer::AddedToken;
 use tk::Tokenizer;
 use tk::pre_tokenizers::whitespace::Whitespace;
 use tk::decoders::wordpiece::WordPiece as WordPieceDecoder;
-use tk::normalizers::bert::BertNormalizer;
+// use tk::normalizers::bert::BertNormalizer;
 use std::ffi::{CStr};
 use std::os::raw::{c_char, c_int};
 use std::string::String;
 
 static mut TOKENIZERS: Vec<Tokenizer> = Vec::new();
 static mut NUM_CONTEXTS: i32 = 0;
+static mut DO_LOWER_CASE: bool = false;
 
 #[repr(C)]
 pub struct Query {
@@ -56,13 +57,14 @@ fn charp_to_str(charp: *const c_char) -> String {
     }
 }
 
-fn get_tokens_from_str(token_str: &str) -> Vec<AddedToken> {
+fn get_tokens_from_str(token_str: &str, to_lowercase: bool) -> Vec<AddedToken> {
     let mut ret: Vec<AddedToken> = Vec::new();
 
     for token in token_str.split(" ") {
         ret.push(
             AddedToken::from(
-                String::from(token),
+                if to_lowercase {token.to_lowercase()} else {String::from(token)},
+                // String::from(token),
                 true
             ).single_word(true)
         );
@@ -84,10 +86,17 @@ fn process_one_query(
     query: &mut Query,
     max_num_ids: c_int,
 ) {
-    let line = query.get_input_string();
-    let encoded = tokenizer.encode(line.to_owned(), false).expect("Encode failed!");
-    query.set_token_ids(encoded.get_ids(), max_num_ids as usize);
-    query.set_flag(true);
+    unsafe {
+        let line = if DO_LOWER_CASE {
+            query.get_input_string()
+        } else {
+            query.get_input_string().to_lowercase()
+        };
+        let encoded = tokenizer.encode(line.to_owned(), false).expect("Encode failed!");
+        query.set_token_ids(encoded.get_ids(), max_num_ids as usize);
+        println!("Tokens: \t\t{:?}", encoded.get_tokens());
+        query.set_flag(true);
+    }
 }
 
 #[no_mangle]
@@ -107,13 +116,13 @@ pub extern "C" fn BertTokenizerV2Init(
         Ok(m) => m,
         Err(_) => return false
     };
-    let special_tokens = get_tokens_from_str(charp_to_str(p_special_tokens).as_str());
-    let normalizer = BertNormalizer::new(true, true, Some(true), do_lower_case);
+    let special_tokens = get_tokens_from_str(charp_to_str(p_special_tokens).as_str(), do_lower_case);
+    // let normalizer = BertNormalizer::new(true, true, Some(true), do_lower_case);
 
     let mut tokenizer = Tokenizer::new(wp);
 
     tokenizer
-        .with_normalizer(normalizer)
+        // .with_normalizer(normalizer)
         .with_pre_tokenizer(Whitespace::default())
         .with_decoder(WordPieceDecoder::default())
         .add_special_tokens(&special_tokens[..]);

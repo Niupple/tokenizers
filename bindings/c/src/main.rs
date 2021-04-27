@@ -4,6 +4,7 @@ use tk::Tokenizer;
 use tk::tokenizer::{AddedToken};
 use tk::pre_tokenizers::whitespace::Whitespace;
 use tk::decoders::wordpiece::WordPiece as WordPieceDecoder;
+use tk::normalizers::bert::BertNormalizer;
 
 fn main() {
     println!("Hello, world!");
@@ -13,9 +14,7 @@ fn main() {
         .build()
         .expect("Fail to build wp");
     let mut tokenizer = Tokenizer::new(wp);
-    tokenizer
-        .with_pre_tokenizer(Whitespace::default())
-        .with_decoder(WordPieceDecoder::default());
+
 
     // let sts = "special_tokens.txt";
     // let fp_sts = File::open(sts).expect("Failed to open the file");
@@ -32,13 +31,20 @@ fn main() {
     // }
     // tokenizer.add_special_tokens(&tokens[..]);
 
-    let special_tokens_str = "[UNK] [SEP] [PAD] [CLS] [MASK]";
+    let normalizer = BertNormalizer::new(true, true, Some(true), true);
+
+    let special_tokens_str = "[UNK] [SEP] [PAD] [CLS] [mask]";
     let special_tokens = special_tokens_str.split(" ");
     let mut tokens: Vec<AddedToken> = Vec::new();
     for token in special_tokens {
         tokens.push(AddedToken::from(String::from(token), true).single_word(true));
     }
-    tokenizer.add_special_tokens(&tokens[..]);
+
+    tokenizer
+        .with_normalizer(normalizer)
+        .with_pre_tokenizer(Whitespace::default())
+        .with_decoder(WordPieceDecoder::default())
+        .add_special_tokens(&tokens[..]);
 
     let line = String::from("In sleep he sang to me, in [MASK] he came.");
     let encoded = tokenizer.encode(line.clone(), false).expect("Failed to encode");
